@@ -1,102 +1,12 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Globalization;
-using System.IO;
-using System.Text;
-using System.Web.Routing;
-using Nop.Core;
-using Nop.Core.Domain.Catalog;
-using Nop.Core.Domain.Directory;
-using Nop.Core.Domain.Stores;
-using Nop.Core.Html;
+﻿using System.Web.Routing;
 using Nop.Core.Plugins;
-using Nop.Services.Catalog;
 using Nop.Services.Common;
-using Nop.Services.Configuration;
-using Nop.Services.Directory;
 using Nop.Services.Localization;
-using Nop.Services.Media;
-using Nop.Services.Seo;
 
 namespace Nop.Plugin.Feed.PriceGrabber
 {
     public class PriceGrabberService : BasePlugin,  IMiscPlugin
     {
-        #region Fields
-
-        private readonly IProductService _productService;
-        private readonly ICategoryService _categoryService;
-        private readonly IManufacturerService _manufacturerService;
-        private readonly IPictureService _pictureService;
-        private readonly ICurrencyService _currencyService;
-        private readonly IWebHelper _webHelper;
-        private readonly ISettingService _settingService;
-        private readonly PriceGrabberSettings _priceGrabberSettings;
-        private readonly CurrencySettings _currencySettings;
-
-        #endregion
-
-        #region Ctor
-        public PriceGrabberService(IProductService productService,
-            ICategoryService categoryService, 
-            IManufacturerService manufacturerService, IPictureService pictureService,
-            ICurrencyService currencyService, IWebHelper webHelper,
-            ISettingService settingService,
-            PriceGrabberSettings priceGrabberSettings, CurrencySettings currencySettings)
-        {
-            this._productService = productService;
-            this._categoryService = categoryService;
-            this._manufacturerService = manufacturerService;
-            this._pictureService = pictureService;
-            this._currencyService = currencyService;
-            this._webHelper = webHelper;
-            this._settingService = settingService;
-            this._priceGrabberSettings = priceGrabberSettings;
-            this._currencySettings = currencySettings;
-        }
-
-        #endregion
-
-        #region Utilities
-
-        private Nop.Core.Domain.Directory.Currency GetUsedCurrency()
-        {
-            var currency = _currencyService.GetCurrencyById(_priceGrabberSettings.CurrencyId);
-            if (currency == null || !currency.Published)
-                currency = _currencyService.GetCurrencyById(_currencySettings.PrimaryStoreCurrencyId);
-            return currency;
-        }
-
-        private static string RemoveSpecChars(string s)
-        {
-            if (String.IsNullOrEmpty(s))
-                return s;
-            s = s.Replace(';', ',');
-            s = s.Replace('\r', ' ');
-            s = s.Replace('\n', ' ');
-            return s;
-        }
-
-        private IList<Category> GetCategoryBreadCrumb(Category category)
-        {
-            if (category == null)
-                throw new ArgumentNullException("category");
-
-            var breadCrumb = new List<Category>();
-
-            while (category != null && //category is not null
-                !category.Deleted && //category is not deleted
-                category.Published) //category is published
-            {
-                breadCrumb.Add(category);
-                category = _categoryService.GetCategoryById(category.ParentCategoryId);
-            }
-            breadCrumb.Reverse();
-            return breadCrumb;
-        }
-
-        #endregion
-
         #region Methods
 
         /// <summary>
@@ -113,142 +23,18 @@ namespace Nop.Plugin.Feed.PriceGrabber
         }
 
         /// <summary>
-        /// Generate a feed
-        /// </summary>
-        /// <param name="stream">Stream</param>
-        /// <returns>Generated feed</returns>
-        public void GenerateFeed(Stream stream, Store store)
-        {
-            if (stream == null)
-                throw new ArgumentNullException("stream");
-
-            if (store == null)
-                throw new ArgumentNullException("store");
-
-            using (var writer = new StreamWriter(stream))
-            {
-                writer.WriteLine("Unique Retailer SKU;Manufacturer Name;Manufacturer Part Number;Product Title;Categorization;Product URL;Image URL;Detailed Description;Selling Price;Condition;Availability");
-
-
-                var products1 = _productService.SearchProducts(storeId: store.Id,
-                visibleIndividuallyOnly: true);
-                foreach (var product1 in products1)
-                {
-
-                    var productsToProcess = new List<Product>();
-                    switch (product1.ProductType)
-                    {
-                        case ProductType.SimpleProduct:
-                            {
-                                //simple product doesn't have child products
-                                productsToProcess.Add(product1);
-                            }
-                            break;
-                        case ProductType.GroupedProduct:
-                            {
-                                //grouped products could have several child products
-                                var associatedProducts = _productService.SearchProducts(product1.Id, store.Id);
-                                productsToProcess.AddRange(associatedProducts);
-                            }
-                            break;
-                        default:
-                            continue;
-                    }
-                    foreach (var product in productsToProcess)
-                    {
-
-                        string sku = product.Id.ToString();
-                        var productManufacturers = _manufacturerService.GetProductManufacturersByProductId(product.Id, false);
-                        string manufacturerName = productManufacturers.Count > 0 ? productManufacturers[0].Manufacturer.Name : String.Empty;
-                        string manufacturerPartNumber = product.ManufacturerPartNumber;
-                        string productTitle = product.Name;
-                        //TODO add a method for getting product URL (e.g. SEOHelper.GetProductUrl)
-                        var productUrl = string.Format("{0}{1}", _webHelper.GetStoreLocation(false), product.GetSeName());
-
-                        string imageUrl = string.Empty;
-                        var pictures = _pictureService.GetPicturesByProductId(product.Id, 1);
-
-                        //always use HTTP when getting image URL
-                        if (pictures.Count > 0)
-                            imageUrl = _pictureService.GetPictureUrl(pictures[0], _priceGrabberSettings.ProductPictureSize, storeLocation: store.Url);
-                        else
-                            imageUrl = _pictureService.GetDefaultPictureUrl(_priceGrabberSettings.ProductPictureSize, storeLocation: store.Url);
-
-                        string description = product.FullDescription;
-                        var currency = GetUsedCurrency();
-                        string price = _currencyService.ConvertFromPrimaryStoreCurrency(product.Price, currency).ToString(new CultureInfo("en-US", false).NumberFormat);
-                        string availability = product.StockQuantity > 0 ? "Yes" : "No";
-                        string categorization = "no category";
-
-                        if (String.IsNullOrEmpty(description))
-                        {
-                            description = product.ShortDescription;
-                        }
-                        if (String.IsNullOrEmpty(description))
-                        {
-                            description = product.Name;
-                        }
-
-                        var productCategories = _categoryService.GetProductCategoriesByProductId(product.Id);
-                        if (productCategories.Count > 0)
-                        {
-                            var firstCategory = productCategories[0].Category;
-                            if (firstCategory != null)
-                            {
-                                var sb = new StringBuilder();
-                                foreach (var cat in GetCategoryBreadCrumb(firstCategory))
-                                {
-                                    sb.AppendFormat("{0}>", cat.Name);
-                                }
-                                sb.Length -= 1;
-                                categorization = sb.ToString();
-                            }
-                        }
-
-                        productTitle = RemoveSpecChars(productTitle);
-                        manufacturerPartNumber = RemoveSpecChars(manufacturerPartNumber);
-                        manufacturerName = RemoveSpecChars(manufacturerName);
-                        description = HtmlHelper.StripTags(description);
-                        description = RemoveSpecChars(description);
-                        categorization = RemoveSpecChars(categorization);
-
-                        writer.WriteLine("{0};{1};{2};{3};{4};{5};{6};{7};{8};New;{9}",
-                            sku,
-                            manufacturerName,
-                            manufacturerPartNumber,
-                            productTitle,
-                            categorization,
-                            productUrl,
-                            imageUrl,
-                            description,
-                            price,
-                            availability);
-                    }
-                }
-            }
-        }
-
-
-        /// <summary>
-        /// Install plugin
+        /// Install the plugin
         /// </summary>
         public override void Install()
         {
-            //settings
-            var settings = new PriceGrabberSettings()
-            {
-                ProductPictureSize = 125,
-            };
-            _settingService.SaveSetting(settings);
-
             //locales
-            this.AddOrUpdatePluginLocaleResource("Plugins.Feed.PriceGrabber.ClickHere", "Click here");
-            this.AddOrUpdatePluginLocaleResource("Plugins.Feed.PriceGrabber.Currency", "Currency");
-            this.AddOrUpdatePluginLocaleResource("Plugins.Feed.PriceGrabber.Currency.Hint", "Select the default currency that will be used to generate the feed.");
+            this.AddOrUpdatePluginLocaleResource("Plugins.Feed.PriceGrabber.ClickHere", "Click here to see generated feed");
+            this.AddOrUpdatePluginLocaleResource("Plugins.Feed.PriceGrabber.Fields.Currency", "Currency");
+            this.AddOrUpdatePluginLocaleResource("Plugins.Feed.PriceGrabber.Fields.Currency.Hint", "Select the currency that will be used to generate the feed.");
+            this.AddOrUpdatePluginLocaleResource("Plugins.Feed.PriceGrabber.Fields.ProductPictureSize", "Product thumbnail image size");
+            this.AddOrUpdatePluginLocaleResource("Plugins.Feed.PriceGrabber.Fields.ProductPictureSize.Hint", "The size in pixels for product thumbnail images (longest size).");
             this.AddOrUpdatePluginLocaleResource("Plugins.Feed.PriceGrabber.Generate", "Generate feed");
-            this.AddOrUpdatePluginLocaleResource("Plugins.Feed.PriceGrabber.ProductPictureSize", "Product thumbnail image size");
-            this.AddOrUpdatePluginLocaleResource("Plugins.Feed.PriceGrabber.ProductPictureSize.Hint", "The default size (pixels) for product thumbnail images.");
-            this.AddOrUpdatePluginLocaleResource("Plugins.Feed.PriceGrabber.SuccessResult", "PriceGrabber feed has been successfully generated. {0} to see generated feed");
+            this.AddOrUpdatePluginLocaleResource("Plugins.Feed.PriceGrabber.Success", "PriceGrabber feed has been successfully generated");
             
             base.Install();
         }
@@ -258,17 +44,14 @@ namespace Nop.Plugin.Feed.PriceGrabber
         /// </summary>
         public override void Uninstall()
         {
-            //settings
-            _settingService.DeleteSetting<PriceGrabberSettings>();
-
             //locales
             this.DeletePluginLocaleResource("Plugins.Feed.PriceGrabber.ClickHere");
-            this.DeletePluginLocaleResource("Plugins.Feed.PriceGrabber.Currency");
-            this.DeletePluginLocaleResource("Plugins.Feed.PriceGrabber.Currency.Hint");
+            this.DeletePluginLocaleResource("Plugins.Feed.PriceGrabber.Fields.Currency");
+            this.DeletePluginLocaleResource("Plugins.Feed.PriceGrabber.Fields.Currency.Hint");
+            this.DeletePluginLocaleResource("Plugins.Feed.PriceGrabber.Fields.ProductPictureSize");
+            this.DeletePluginLocaleResource("Plugins.Feed.PriceGrabber.Fields.ProductPictureSize.Hint");
             this.DeletePluginLocaleResource("Plugins.Feed.PriceGrabber.Generate");
-            this.DeletePluginLocaleResource("Plugins.Feed.PriceGrabber.ProductPictureSize");
-            this.DeletePluginLocaleResource("Plugins.Feed.PriceGrabber.ProductPictureSize.Hint");
-            this.DeletePluginLocaleResource("Plugins.Feed.PriceGrabber.SuccessResult");
+            this.DeletePluginLocaleResource("Plugins.Feed.PriceGrabber.Success");
             
             base.Uninstall();
         }
