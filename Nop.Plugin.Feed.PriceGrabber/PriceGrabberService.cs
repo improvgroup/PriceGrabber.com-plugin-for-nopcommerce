@@ -19,7 +19,7 @@ namespace Nop.Plugin.Feed.PriceGrabber
         {
             actionName = "Configure";
             controllerName = "FeedPriceGrabber";
-            routeValues = new RouteValueDictionary() { { "Namespaces", "Nop.Plugin.Feed.PriceGrabber.Controllers" }, { "area", null } };
+            routeValues = new RouteValueDictionary { { "Namespaces", "Nop.Plugin.Feed.PriceGrabber.Controllers" }, { "area", null } };
         }
 
         /// <summary>

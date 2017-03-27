@@ -94,10 +94,10 @@ namespace Nop.Plugin.Feed.PriceGrabber.Controllers
             {
                 ProductPictureSize = 125,
                 CurrencyId = _currencySettings.PrimaryStoreCurrencyId,
-                AvailableCurrencies = _currencyService.GetAllCurrencies().ToSelectList(x => (x as Currency).Name)
+                AvailableCurrencies = _currencyService.GetAllCurrencies().ToSelectList(x => ((Currency) x).Name)
             };
             
-            return View("~/Plugins/Feed.PriceGrabber/Views/FeedPriceGrabber/Configure.cshtml", model);
+            return View("~/Plugins/Feed.PriceGrabber/Views/Configure.cshtml", model);
         }
 
         [HttpPost, ActionName("Configure")]
@@ -115,7 +115,7 @@ namespace Nop.Plugin.Feed.PriceGrabber.Controllers
             try
             {
                 var fileName = string.Format("priceGrabber_{0}_{1}.csv", DateTime.Now.ToString("yyyy-MM-dd-HH-mm-ss"), CommonHelper.GenerateRandomDigitCode(4));
-                using (var writer = new StreamWriter(Path.Combine(Request.PhysicalApplicationPath, "content\\files\\exportimport", fileName)))
+                using (var writer = new StreamWriter(Path.Combine(Request.PhysicalApplicationPath ?? string.Empty, "content\\files\\exportimport", fileName)))
                 {
                     //write header
                     writer.WriteLine("Unique Retailer SKU;Manufacturer Name;Manufacturer Part Number;Product Title;Categorization;" +
@@ -215,9 +215,9 @@ namespace Nop.Plugin.Feed.PriceGrabber.Controllers
             }
 
             //prepare currencies
-            model.AvailableCurrencies = _currencyService.GetAllCurrencies().ToSelectList(x => (x as Currency).Name);
+            model.AvailableCurrencies = _currencyService.GetAllCurrencies().ToSelectList(x => ((Currency) x).Name);
 
-            return View("~/Plugins/Feed.PriceGrabber/Views/FeedPriceGrabber/Configure.cshtml", model);
+            return View("~/Plugins/Feed.PriceGrabber/Views/Configure.cshtml", model);
         }
 
         #endregion
