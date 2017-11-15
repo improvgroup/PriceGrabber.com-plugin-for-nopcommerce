@@ -3,7 +3,8 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Linq;
-using System.Web.Mvc;
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Mvc;
 using Nop.Core;
 using Nop.Core.Domain.Catalog;
 using Nop.Core.Domain.Directory;
@@ -14,13 +15,17 @@ using Nop.Services.Directory;
 using Nop.Services.Localization;
 using Nop.Services.Logging;
 using Nop.Services.Media;
+using Nop.Services.Security;
 using Nop.Services.Seo;
 using Nop.Services.Stores;
+using Nop.Web.Framework;
 using Nop.Web.Framework.Controllers;
+using Nop.Web.Framework.Mvc.Filters;
 
 namespace Nop.Plugin.Feed.PriceGrabber.Controllers
 {
-    [AdminAuthorize]
+    [AuthorizeAdmin]
+    [Area(AreaNames.Admin)]
     public class FeedPriceGrabberController : BasePluginController
     {
         #region Fields
@@ -36,6 +41,8 @@ namespace Nop.Plugin.Feed.PriceGrabber.Controllers
         private readonly IStoreService _storeService;
         private readonly IWebHelper _webHelper;
         private readonly IWorkContext _workContext;
+        private readonly IHostingEnvironment _hostingEnvironment;
+        private readonly IPermissionService _permissionService;
 
         #endregion
 
@@ -51,7 +58,9 @@ namespace Nop.Plugin.Feed.PriceGrabber.Controllers
             IProductService productService,
             IStoreService storeService,
             IWebHelper webHelper,
-            IWorkContext workContext)
+            IWorkContext workContext,
+            IHostingEnvironment hostingEnvironment,
+            IPermissionService permissionService)
         {
             this._currencySettings = currencySettings;
             this._categoryService = categoryService;
@@ -64,6 +73,8 @@ namespace Nop.Plugin.Feed.PriceGrabber.Controllers
             this._storeService = storeService;
             this._webHelper = webHelper;
             this._workContext = workContext;
+            this._hostingEnvironment = hostingEnvironment;
+            this._permissionService = permissionService;
         }
 
         #endregion
@@ -87,9 +98,11 @@ namespace Nop.Plugin.Feed.PriceGrabber.Controllers
 
         #region Methods
 
-        [ChildActionOnly]
-        public ActionResult Configure()
+        public IActionResult Configure()
         {
+            if (!_permissionService.Authorize(StandardPermissionProvider.ManageProducts))
+                return AccessDeniedView();
+
             var model = new FeedPriceGrabberModel
             {
                 ProductPictureSize = 125,
@@ -101,10 +114,12 @@ namespace Nop.Plugin.Feed.PriceGrabber.Controllers
         }
 
         [HttpPost, ActionName("Configure")]
-        [ChildActionOnly]
         [FormValueRequired("generate")]
-        public ActionResult GenerateFeed(FeedPriceGrabberModel model)
+        public IActionResult GenerateFeed(FeedPriceGrabberModel model)
         {
+            if (!_permissionService.Authorize(StandardPermissionProvider.ManageProducts))
+                return AccessDeniedView();
+
             if (!ModelState.IsValid)
                 return Configure();
 
@@ -114,8 +129,8 @@ namespace Nop.Plugin.Feed.PriceGrabber.Controllers
 
             try
             {
-                var fileName = string.Format("priceGrabber_{0}_{1}.csv", DateTime.Now.ToString("yyyy-MM-dd-HH-mm-ss"), CommonHelper.GenerateRandomDigitCode(4));
-                using (var writer = new StreamWriter(Path.Combine(Request.PhysicalApplicationPath ?? string.Empty, "content\\files\\exportimport", fileName)))
+                var fileName = $"priceGrabber_{DateTime.Now:yyyy-MM-dd-HH-mm-ss}_{CommonHelper.GenerateRandomDigitCode(4)}.csv";
+                using (var writer = new StreamWriter(Path.Combine(_hostingEnvironment.WebRootPath, "files\\exportimport", fileName)))
                 {
                     //write header
                     writer.WriteLine("Unique Retailer SKU;Manufacturer Name;Manufacturer Part Number;Product Title;Categorization;" +
@@ -169,7 +184,7 @@ namespace Nop.Plugin.Feed.PriceGrabber.Controllers
                             categorization = ReplaceSpecChars(categorization);
 
                             //product URL
-                            var productUrl = string.Format("{0}{1}", storeUrl, product.GetSeName());
+                            var productUrl = $"{storeUrl}{product.GetSeName()}";
 
                             //image Url
                             var picture = _pictureService.GetPicturesByProductId(product.Id, 1).FirstOrDefault();
@@ -203,8 +218,7 @@ namespace Nop.Plugin.Feed.PriceGrabber.Controllers
                 }
 
                 //link for the result
-                model.GenerateFeedResult = string.Format("<a href=\"{0}content/files/exportimport/{1}\" target=\"_blank\">{2}</a>",
-                    storeUrl, fileName, _localizationService.GetResource("Plugins.Feed.PriceGrabber.ClickHere"));
+                model.GenerateFeedResult = $"<a href=\"{storeUrl}wwwroot/files/exportimport/{fileName}\" target=\"_blank\">{_localizationService.GetResource("Plugins.Feed.PriceGrabber.ClickHere")}</a>";
 
                 SuccessNotification(_localizationService.GetResource("Plugins.Feed.PriceGrabber.Success"));
             }

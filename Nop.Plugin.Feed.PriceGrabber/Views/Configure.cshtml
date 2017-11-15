@@ -1,33 +1,28 @@
 ﻿@{
-    Layout = "";
+    Layout = "_ConfigurePlugin";
 }
 @model Nop.Plugin.Feed.PriceGrabber.Models.FeedPriceGrabberModel
-@using Nop.Web.Framework;
 
-@Html.Action("StoreScopeConfiguration", "Setting", new { area = "Admin" })
-
-@using (Html.BeginForm())
-{
-    @Html.AntiForgeryToken()
+<form asp-controller="FeedPriceGrabber" asp-action="Configure" method="post">
     <div class="panel-group">
         <div class="panel panel-default">
             <div class="panel-body">
                 <div class="form-group">
                     <div class="col-md-3">
-                        @Html.NopLabelFor(model => model.ProductPictureSize)
+                        <nop-label asp-for="ProductPictureSize" />
                     </div>
                     <div class="col-md-9">
-                        @Html.NopEditorFor(model => model.ProductPictureSize)
-                        @Html.ValidationMessageFor(model => model.ProductPictureSize)
+                        <nop-editor asp-for="ProductPictureSize" />
+                        <span asp-validation-for="ProductPictureSize"></span>
                     </div>
                 </div>
                 <div class="form-group">
                     <div class="col-md-3">
-                        @Html.NopLabelFor(model => model.CurrencyId)
+                        <nop-label asp-for="CurrencyId" />
                     </div>
                     <div class="col-md-9">
-                        @Html.NopDropDownListFor(model => model.CurrencyId, Model.AvailableCurrencies)
-                        @Html.ValidationMessageFor(model => model.CurrencyId)
+                        <nop-select asp-for="CurrencyId" asp-items="Model.AvailableCurrencies" />
+                        <span asp-validation-for="CurrencyId"></span>
                     </div>
                 </div>
                 <div class="form-group">
@@ -42,5 +37,5 @@
                 </div>
             </div>
         </div>
-    </div>  
-}
+    </div>
+</form>

@@ -1,4 +1,4 @@
-﻿using System.Web.Routing;
+﻿using Nop.Core;
 using Nop.Core.Plugins;
 using Nop.Services.Common;
 using Nop.Services.Localization;
@@ -7,19 +7,27 @@ namespace Nop.Plugin.Feed.PriceGrabber
 {
     public class PriceGrabberService : BasePlugin,  IMiscPlugin
     {
+
+        #region Fields
+       
+        private readonly IWebHelper _webHelper;
+
+        #endregion
+
+        #region Ctor
+
+        public PriceGrabberService(IWebHelper webHelper)
+        {
+            this._webHelper = webHelper;
+        }
+
+        #endregion
+
         #region Methods
 
-        /// <summary>
-        /// Gets a route for provider configuration
-        /// </summary>
-        /// <param name="actionName">Action name</param>
-        /// <param name="controllerName">Controller name</param>
-        /// <param name="routeValues">Route values</param>
-        public void GetConfigurationRoute(out string actionName, out string controllerName, out RouteValueDictionary routeValues)
+        public override string GetConfigurationPageUrl()
         {
-            actionName = "Configure";
-            controllerName = "FeedPriceGrabber";
-            routeValues = new RouteValueDictionary { { "Namespaces", "Nop.Plugin.Feed.PriceGrabber.Controllers" }, { "area", null } };
+            return $"{_webHelper.GetStoreLocation()}Admin/FeedPriceGrabber/Configure";
         }
 
         /// <summary>

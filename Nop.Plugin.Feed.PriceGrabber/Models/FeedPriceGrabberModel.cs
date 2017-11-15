@@ -1,5 +1,5 @@
-﻿using System.Web.Mvc;
-using Nop.Web.Framework;
+﻿using Microsoft.AspNetCore.Mvc.Rendering;
+using Nop.Web.Framework.Mvc.ModelBinding;
 
 namespace Nop.Plugin.Feed.PriceGrabber.Models
 {

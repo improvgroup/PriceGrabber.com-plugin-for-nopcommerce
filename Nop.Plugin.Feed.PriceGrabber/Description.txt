@@ -1,9 +1,0 @@
-﻿Group: Promotion feeds
-FriendlyName: PriceGrabber
-SystemName: PromotionFeed.PriceGrabber
-Version: 1.30
-SupportedVersions: 3.90
-Author: nopCommerce team
-DisplayOrder: 1
-FileName: Nop.Plugin.Feed.PriceGrabber.dll
-Description: This plugin enables generate feed for the PriceGrabber
