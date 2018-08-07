@@ -38,11 +38,11 @@ namespace Nop.Plugin.Feed.PriceGrabber.Controllers
         private readonly IManufacturerService _manufacturerService;
         private readonly IPictureService _pictureService;
         private readonly IProductService _productService;
-        private readonly IStoreService _storeService;
+        private readonly IStoreContext _storeContext;
         private readonly IWebHelper _webHelper;
-        private readonly IWorkContext _workContext;
         private readonly IHostingEnvironment _hostingEnvironment;
         private readonly IPermissionService _permissionService;
+        private readonly IUrlRecordService _urlRecordService;
 
         #endregion
 
@@ -56,11 +56,11 @@ namespace Nop.Plugin.Feed.PriceGrabber.Controllers
             IManufacturerService manufacturerService,
             IPictureService pictureService,
             IProductService productService,
-            IStoreService storeService,
+            IStoreContext storeContext,
             IWebHelper webHelper,
-            IWorkContext workContext,
             IHostingEnvironment hostingEnvironment,
-            IPermissionService permissionService)
+            IPermissionService permissionService,
+            IUrlRecordService urlRecordService)
         {
             this._currencySettings = currencySettings;
             this._categoryService = categoryService;
@@ -70,11 +70,11 @@ namespace Nop.Plugin.Feed.PriceGrabber.Controllers
             this._manufacturerService = manufacturerService;
             this._pictureService = pictureService;
             this._productService = productService;
-            this._storeService = storeService;
+            this._storeContext = storeContext;
             this._webHelper = webHelper;
-            this._workContext = workContext;
             this._hostingEnvironment = hostingEnvironment;
             this._permissionService = permissionService;
+            this._urlRecordService = urlRecordService;
         }
 
         #endregion
@@ -124,7 +124,7 @@ namespace Nop.Plugin.Feed.PriceGrabber.Controllers
                 return Configure();
 
             //load settings for a chosen store scope
-            var storeScope = GetActiveStoreScopeConfiguration(_storeService, _workContext);
+            var storeScope = _storeContext.ActiveStoreScopeConfiguration;
             var storeUrl = _webHelper.GetStoreLocation();
 
             try
@@ -180,11 +180,11 @@ namespace Nop.Plugin.Feed.PriceGrabber.Controllers
                             //category
                             var productCategory = _categoryService.GetProductCategoriesByProductId(product.Id).FirstOrDefault();
                             var categorization = productCategory != null && productCategory.Category != null
-                                ? productCategory.Category.GetFormattedBreadCrumb(_categoryService, ">") : "no category";
+                                ? _categoryService.GetFormattedBreadCrumb(productCategory.Category, separator: ">") : "no category";
                             categorization = ReplaceSpecChars(categorization);
 
                             //product URL
-                            var productUrl = $"{storeUrl}{product.GetSeName()}";
+                            var productUrl = $"{storeUrl}{_urlRecordService.GetSeName(product)}";
 
                             //image Url
                             var picture = _pictureService.GetPicturesByProductId(product.Id, 1).FirstOrDefault();
@@ -218,7 +218,7 @@ namespace Nop.Plugin.Feed.PriceGrabber.Controllers
                 }
 
                 //link for the result
-                model.GenerateFeedResult = $"<a href=\"{storeUrl}wwwroot/files/exportimport/{fileName}\" target=\"_blank\">{_localizationService.GetResource("Plugins.Feed.PriceGrabber.ClickHere")}</a>";
+                model.GenerateFeedResult = $"<a href=\"{storeUrl}files/exportimport/{fileName}\" target=\"_blank\">{_localizationService.GetResource("Plugins.Feed.PriceGrabber.ClickHere")}</a>";
 
                 SuccessNotification(_localizationService.GetResource("Plugins.Feed.PriceGrabber.Success"));
             }
